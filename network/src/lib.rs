@@ -24,7 +24,7 @@ pub enum NetworkError {
     SerializationError(#[from] Box<bincode::ErrorKind>),
 }
 
-pub struct NetMessage(pub Bytes, pub Vec<SocketAddr>);
+pub struct NetMessage(pub Bytes, pub Vec<SocketAddr>, pub String);
 
 pub struct NetSender {
     transmit: Receiver<NetMessage>,
@@ -41,15 +41,15 @@ impl NetSender {
     // a connection die, we make a new one.
     pub async fn run(&mut self) {
         let mut senders = HashMap::<_, Sender<_>>::new();
-        while let Some(NetMessage(bytes, addresses)) = self.transmit.recv().await {
+        while let Some(NetMessage(bytes, addresses, debug_message)) = self.transmit.recv().await {
             for address in addresses {
                 let spawn = match senders.get(&address) {
-                    Some(tx) => tx.send(bytes.clone()).await.is_err(),
+                    Some(tx) => tx.send((bytes.clone(), debug_message.clone())).await.is_err(),
                     None => true,
                 };
                 if spawn {
                     let tx = Self::spawn_worker(address).await;
-                    if let Ok(()) = tx.send(bytes.clone()).await {
+                    if let Ok(()) = tx.send((bytes.clone(), debug_message.clone())).await {
                         senders.insert(address, tx);
                     }
                 }
@@ -57,7 +57,7 @@ impl NetSender {
         }
     }
 
-    async fn spawn_worker(address: SocketAddr) -> Sender<Bytes> {
+    async fn spawn_worker(address: SocketAddr) -> Sender<(Bytes, String)> {
         // Each worker handle a TCP connection with on address.
         let (tx, mut rx) = channel(1000);
         tokio::spawn(async move {
@@ -72,7 +72,8 @@ impl NetSender {
                 }
             };
             let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
-            while let Some(message) = rx.recv().await {
+            while let Some((message, debug_message)) = rx.recv().await {
+                debug!("Sending {}", debug_message);
                 match transport.send(message).await {
                     Ok(_) => debug!("Successfully sent message to {}", address),
                     Err(e) => {

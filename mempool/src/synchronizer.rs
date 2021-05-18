@@ -188,7 +188,7 @@ impl Synchronizer {
             committee.broadcast_addresses(&from)
         };
         let bytes = bincode::serialize(message).expect("Failed to serialize core message");
-        let message = NetMessage(Bytes::from(bytes), addresses);
+        let message = NetMessage(Bytes::from(bytes), addresses, "".to_string());
         if let Err(e) = network_channel.send(message).await {
             panic!("Failed to send block through network channel: {}", e);
         }

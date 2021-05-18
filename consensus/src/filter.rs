@@ -32,8 +32,9 @@ impl Filter {
 
     async fn transmit(input: FilterInput, network: &Sender<NetMessage>) {
         let (message, addresses) = input;
+        let debug_message = format!("{:?}", message).to_string();
         let bytes = bincode::serialize(&message).expect("Failed to serialize core message");
-        let net_message = NetMessage(Bytes::from(bytes), addresses);
+        let net_message = NetMessage(Bytes::from(bytes), addresses, debug_message);
         if let Err(e) = network.send(net_message).await {
             panic!("Failed to send block through network channel: {}", e);
         }
