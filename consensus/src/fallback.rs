@@ -576,12 +576,10 @@ impl Fallback {
     async fn process_block(&mut self, block: &Block) -> ConsensusResult<()> {
         debug!("Processing block {}, content {:?}", block.digest(), block);
 
-        // for earlier fallback block, if proposed by non-leader, neglect
-        if block.fallback != 0 {
-            if let Some(leader) = self.leader_elector.get_fallback_leader(block.view) {
-                if block.author != leader {
-                    return Ok(());
-                }
+        // for earlier fallback block, if not endorsed, neglect
+        if block.fallback == 1 {
+            if block.view < self.view && !self.valid_qc(&block.qc) {
+                return Ok(());
             }
         } 
 
@@ -747,12 +745,10 @@ impl Fallback {
             return Ok(());
         }
 
-        // for earlier fallback block, if proposed by non-leader, neglect
-        if block.fallback != 0 {
-            if let Some(leader) = self.leader_elector.get_fallback_leader(block.view) {
-                if block.author != leader {
-                    return Ok(());
-                }
+        // for earlier fallback block, if not endorsed, neglect
+        if block.fallback == 1 {
+            if block.view < self.view && !self.valid_qc(&block.qc) {
+                return Ok(());
             }
         } 
 
