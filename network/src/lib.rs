@@ -42,6 +42,7 @@ impl NetSender {
     pub async fn run(&mut self) {
         let mut senders = HashMap::<_, Sender<_>>::new();
         while let Some(NetMessage(bytes, addresses, debug_message)) = self.transmit.recv().await {
+            debug!("Network lib send message {}", debug_message);
             for address in addresses {
                 let spawn = match senders.get(&address) {
                     Some(tx) => tx.send((bytes.clone(), debug_message.clone())).await.is_err(),
@@ -59,7 +60,7 @@ impl NetSender {
 
     async fn spawn_worker(address: SocketAddr) -> Sender<(Bytes, String)> {
         // Each worker handle a TCP connection with on address.
-        let (tx, mut rx) = channel(1000);
+        let (tx, mut rx) = channel(10000);
         tokio::spawn(async move {
             let stream = match TcpStream::connect(address).await {
                 Ok(stream) => {
