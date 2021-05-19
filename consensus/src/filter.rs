@@ -7,6 +7,7 @@ use network::NetMessage;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
+use log::debug;
 
 pub type FilterInput = (ConsensusMessage, Vec<SocketAddr>);
 
@@ -35,6 +36,7 @@ impl Filter {
         let debug_message = format!("{:?}", message).to_string();
         let bytes = bincode::serialize(&message).expect("Failed to serialize core message");
         let net_message = NetMessage(Bytes::from(bytes), addresses, debug_message);
+        debug!("Network filter send message {:?}", message);
         if let Err(e) = network.send(net_message).await {
             panic!("Failed to send block through network channel: {}", e);
         }
@@ -46,6 +48,7 @@ impl Filter {
             // NOTE: Increase the delay here (you can use any value from the 'parameters').
             // Only add network delay for non-fallback block proposals
             if parameters.ddos && block.fallback == 0 {
+                debug!("Network filter delay message {:?}", message);
                 sleep(Duration::from_millis(parameters.network_delay)).await;
             }
         }
