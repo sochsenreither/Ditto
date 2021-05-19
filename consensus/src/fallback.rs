@@ -578,6 +578,7 @@ impl Fallback {
 
         // for earlier fallback block, if not endorsed, neglect
         if block.fallback == 1 {
+            debug!("block view {}, self view {}, valid qc {}", block.view, self.view, self.valid_qc(&block.qc));
             if block.view < self.view && !self.valid_qc(&block.qc) {
                 return Ok(());
             }
