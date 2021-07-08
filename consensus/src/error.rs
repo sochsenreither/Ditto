@@ -1,4 +1,4 @@
-use crate::core::RoundNumber;
+use crate::core::{SeqNumber, HeightNumber};
 use crypto::{CryptoError, Digest, PublicKey};
 use store::StoreError;
 use thiserror::Error;
@@ -38,8 +38,23 @@ pub enum ConsensusError {
     #[error("Invalid signature")]
     InvalidSignature(#[from] CryptoError),
 
+    #[error("Invalid threshold signature from {0}")]
+    InvalidThresholdSignature(PublicKey),
+
+    #[error("Random coin with wrong leader")]
+    RandomCoinWithWrongLeader,
+
+    #[error("Random coin with wrong shares")]
+    RandomCoinWithWrongShares,
+
     #[error("Received more than one vote from {0}")]
-    AuthorityReuse(PublicKey),
+    AuthorityReuseinQC(PublicKey),
+
+    #[error("Received more than one timeout from {0}")]
+    AuthorityReuseinTC(PublicKey),
+
+    #[error("Received more than one random share from {0}")]
+    AuthorityReuseinCoin(PublicKey),
 
     #[error("Received vote from unknown authority {0}")]
     UnknownAuthority(PublicKey),
@@ -50,6 +65,9 @@ pub enum ConsensusError {
     #[error("Received TC without a quorum")]
     TCRequiresQuorum,
 
+    #[error("Received RandomCoin without a quorum")]
+    RandomCoinRequiresQuorum,
+
     #[error("Malformed block {0}")]
     MalformedBlock(Digest),
 
@@ -57,9 +75,19 @@ pub enum ConsensusError {
     WrongLeader {
         digest: Digest,
         leader: PublicKey,
-        round: RoundNumber,
+        round: SeqNumber,
     },
+
+    #[error("Invalid block/vote/qc height {0}")]
+    InvalidHeight(HeightNumber),
 
     #[error("Invalid payload")]
     InvalidPayload,
+
+    #[error("Block rounds not consecutive! rounds {rd1}, {rd2} and {rd3}")]
+    NonConsecutiveRounds {
+        rd1: SeqNumber,
+        rd2: SeqNumber,
+        rd3: SeqNumber,
+    },
 }

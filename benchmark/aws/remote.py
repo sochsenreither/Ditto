@@ -6,9 +6,10 @@ from paramiko.ssh_exception import PasswordRequiredException, SSHException
 from os.path import basename, splitext
 from time import sleep
 from math import ceil
+from os.path import join
 import subprocess
 
-from benchmark.config import Committee, Key, NodeParameters, BenchParameters, ConfigError
+from benchmark.config import Committee, Key, TSSKey, NodeParameters, BenchParameters, ConfigError
 from benchmark.utils import BenchError, Print, PathMaker, progress_bar
 from benchmark.commands import CommandMaker
 from benchmark.logs import LogParser, ParseError
@@ -65,7 +66,7 @@ class Bench:
             'source $HOME/.cargo/env',
             'rustup default stable',
 
-            # This is missing from the RockDB installer (needed for RockDB).
+            # This is missing from the Rocksdb installer (needed for Rocksdb).
             'sudo apt-get install -y clang',
 
             # Clone the repo.
@@ -74,12 +75,11 @@ class Bench:
         hosts = self.manager.hosts(flat=True)
         try:
             g = Group(*hosts, user='ubuntu', connect_kwargs=self.connect)
-            output = g.run(' && '.join(cmd), hide=True)
-            self._check_stderr(output)
+            g.run(' && '.join(cmd), hide=True)
             Print.heading(f'Initialized testbed of {len(hosts)} nodes')
-        except GroupException as e:
-            error = FabricError(e)
-            raise BenchError('Failed to install repo on testbed', error)
+        except (GroupException, ExecutionError) as e:
+            e = FabricError(e) if isinstance(e, GroupException) else e
+            raise BenchError('Failed to install repo on testbed', e)
 
     def kill(self, hosts=[], delete_logs=False):
         assert isinstance(hosts, list)
@@ -136,7 +136,6 @@ class Bench:
         # Cleanup all local configuration files.
         cmd = CommandMaker.cleanup()
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
-        sleep(0.5)  # Removing the store may take time.
 
         # Recompile the latest code.
         cmd = CommandMaker.compile().split()
@@ -154,11 +153,23 @@ class Bench:
             subprocess.run(cmd, check=True)
             keys += [Key.from_file(filename)]
 
+        # Generate threshold signature files.
+        nodes = len(hosts)
+        cmd = './node threshold_keys'
+        for i in range(nodes):
+            cmd += ' --filename ' + PathMaker.threshold_key_file(i)
+        cmd = cmd.split()
+        subprocess.run(cmd, capture_output=True, check=True)
+
         names = [x.name for x in keys]
         consensus_addr = [f'{x}:{self.settings.consensus_port}' for x in hosts]
-        mempool_addr = [f'{x}:{self.settings.mempool_port}' for x in hosts]
         front_addr = [f'{x}:{self.settings.front_port}' for x in hosts]
-        committee = Committee(names, consensus_addr, mempool_addr, front_addr)
+        tss_keys = []
+        for i in range(nodes):
+            tss_keys += [TSSKey.from_file(PathMaker.threshold_key_file(i))]
+        ids = [x.id for x in tss_keys]
+        mempool_addr = [f'{x}:{self.settings.mempool_port}' for x in hosts]
+        committee = Committee(names, ids, consensus_addr, front_addr, mempool_addr)
         committee.print(PathMaker.committee_file())
 
         node_parameters.print(PathMaker.parameters_file())
@@ -174,6 +185,7 @@ class Bench:
             c = Connection(host, user='ubuntu', connect_kwargs=self.connect)
             c.put(PathMaker.committee_file(), '.')
             c.put(PathMaker.key_file(i), '.')
+            c.put(PathMaker.threshold_key_file(i), '.')
             c.put(PathMaker.parameters_file(), '.')
 
         return committee
@@ -184,10 +196,15 @@ class Bench:
         # Kill any potentially unfinished run and delete logs.
         self.kill(hosts=hosts, delete_logs=True)
 
+        Print.info('Killed previous instances')
+        sleep(10)
+
         # Run the clients (they will wait for the nodes to be ready).
+        # Filter all faulty nodes from the client addresses (or they will wait
+        # for the faulty nodes to be online).
         committee = Committee.load(PathMaker.committee_file())
-        addresses = committee.front_addresses()
-        rate_share = ceil(rate / committee.size())
+        addresses = [f'{x}:{self.settings.front_port}' for x in hosts]
+        rate_share = ceil(rate / committee.size())  # Take faults into account.
         timeout = node_parameters.timeout_delay
         client_logs = [PathMaker.client_log_file(i) for i in range(len(hosts))]
         for host, addr, log_file in zip(hosts, addresses, client_logs):
@@ -200,13 +217,18 @@ class Bench:
             )
             self._background_run(host, cmd, log_file)
 
+        Print.info('Clients boosted...')
+        sleep(10)
+
         # Run the nodes.
         key_files = [PathMaker.key_file(i) for i in range(len(hosts))]
         dbs = [PathMaker.db_path(i) for i in range(len(hosts))]
         node_logs = [PathMaker.node_log_file(i) for i in range(len(hosts))]
-        for host, key_file, db, log_file in zip(hosts, key_files, dbs, node_logs):
+        threshold_key_files = [PathMaker.threshold_key_file(i) for i in range(len(hosts))]
+        for host, key_file, threshold_key_file, db, log_file in zip(hosts, key_files, threshold_key_files, dbs, node_logs):
             cmd = CommandMaker.run_node(
                 key_file,
+                threshold_key_file,
                 PathMaker.committee_file(),
                 db,
                 PathMaker.parameters_file(),
@@ -216,15 +238,15 @@ class Bench:
 
         # Wait for the nodes to synchronize
         Print.info('Waiting for the nodes to synchronize...')
-        sleep(2 * node_parameters.timeout_delay / 1000)
+        sleep(node_parameters.timeout_delay / 1000)
 
         # Wait for all transactions to be processed.
         duration = bench_parameters.duration
-        for _ in progress_bar(range(20), prefix=f'Running benchmark ({duration} sec):'):
-            sleep(ceil(duration / 20))
+        for _ in progress_bar(range(100), prefix=f'Running benchmark ({duration} sec):'):
+            sleep(ceil(duration / 100))
         self.kill(hosts=hosts, delete_logs=False)
 
-    def _logs(self, hosts):
+    def _logs(self, hosts, faults, protocol, ddos):
         # Delete local logs (if any).
         cmd = CommandMaker.clean_logs()
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
@@ -240,7 +262,7 @@ class Bench:
 
         # Parse logs and return the parser.
         Print.info('Parsing logs and computing performance...')
-        return LogParser.process('./logs')
+        return LogParser.process(PathMaker.logs_path(), faults=faults, protocol=protocol, ddos=ddos)
 
     def run(self, bench_parameters_dict, node_parameters_dict, debug=False):
         assert isinstance(debug, bool)
@@ -264,19 +286,48 @@ class Bench:
             e = FabricError(e) if isinstance(e, GroupException) else e
             raise BenchError('Failed to update nodes', e)
 
+        if node_parameters.protocol == 0:
+            Print.info('Running HotStuff')
+        elif node_parameters.protocol == 1:
+            Print.info('Running AsyncHotStuff')
+        elif node_parameters.protocol == 2:
+            Print.info('Running TwoChainVABA')
+        else:
+            Print.info('Wrong protocol type!')
+            return
+
+        Print.info(f'{bench_parameters.faults} faults')
+        Print.info(f'Timeout {node_parameters.timeout_delay} ms, Network delay {node_parameters.network_delay} ms')
+        Print.info(f'DDOS attack {node_parameters.ddos}')
+
+        hosts = selected_hosts[:bench_parameters.nodes[0]]
+        # Upload all configuration files.
+        try:
+            self._config(hosts, node_parameters)
+        except (subprocess.SubprocessError, GroupException) as e:
+            e = FabricError(e) if isinstance(e, GroupException) else e
+            Print.error(BenchError('Failed to configure nodes', e))
+        
         # Run benchmarks.
         for n in bench_parameters.nodes:
             for r in bench_parameters.rate:
                 Print.heading(f'\nRunning {n} nodes (input rate: {r:,} tx/s)')
                 hosts = selected_hosts[:n]
 
-                # Upload all configuration files.
-                try:
-                    self._config(hosts, node_parameters)
-                except (subprocess.SubprocessError, GroupException) as e:
-                    e = FabricError(e) if isinstance(e, GroupException) else e
-                    Print.error(BenchError('Failed to configure nodes', e))
-                    continue
+                # # Upload all configuration files.
+                # try:
+                #     self._config(hosts, node_parameters)
+                # except (subprocess.SubprocessError, GroupException) as e:
+                #     e = FabricError(e) if isinstance(e, GroupException) else e
+                #     Print.error(BenchError('Failed to configure nodes', e))
+                #     continue
+
+                # Do not boot faulty nodes.
+                faults = bench_parameters.faults
+                hosts = hosts[:n-faults]
+
+                protocol = node_parameters.protocol
+                ddos = node_parameters.ddos
 
                 # Run the benchmark.
                 for i in range(bench_parameters.runs):
@@ -285,8 +336,9 @@ class Bench:
                         self._run_single(
                             hosts, r, bench_parameters, node_parameters, debug
                         )
-                        parser = self._logs(hosts)
-                        parser.print(bench_parameters.result_filename(n, r))
+                        self._logs(hosts, faults, protocol, ddos).print(PathMaker.result_file(
+                            n, r, bench_parameters.tx_size, faults
+                        ))
                     except (subprocess.SubprocessError, GroupException, ParseError) as e:
                         self.kill(hosts=hosts)
                         if isinstance(e, GroupException):

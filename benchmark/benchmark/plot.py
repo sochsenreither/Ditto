@@ -1,10 +1,12 @@
-from re import findall, search
-from glob import glob
+from re import findall, search, split
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator, StrMethodFormatter
-from os.path import join
-from statistics import mean
-import sys
+from matplotlib.ticker import StrMethodFormatter
+from glob import glob
+from itertools import cycle
+
+from benchmark.utils import PathMaker
+from benchmark.config import PlotParameters
+from benchmark.aggregate import LogAggregator
 
 
 class PlotError(Exception):
@@ -13,10 +15,8 @@ class PlotError(Exception):
 
 class Ploter:
     def __init__(self, filenames):
-        ok = isinstance(filenames, list) and filenames \
-            and all(isinstance(x, str) for x in filenames)
-        if not ok:
-            raise PlotError('Invalid input arguments')
+        if not filenames:
+            raise PlotError('No data to plot')
 
         self.results = []
         try:
@@ -26,15 +26,19 @@ class Ploter:
         except OSError as e:
             raise PlotError(f'Failed to load log files: {e}')
 
-    def _tps(self, data):
-        avg = [int(x) for x in findall(r'Average TPS: (\d+)', data)]
-        std = [int(x) for x in findall(r'Std TPS: (\d+)', data)]
-        return avg, std
+    def _natural_keys(self, text):
+        def try_cast(text): return int(text) if text.isdigit() else text
+        return [try_cast(c) for c in split('(\d+)', text)]
 
-    def _latency(self, data):
-        avg = [int(x) for x in findall(r'Average latency: (\d+)', data)]
-        std = [int(x) for x in findall(r'Std latency: (\d+)', data)]
-        return avg, std
+    def _tps(self, data):
+        values = findall(r' TPS: (\d+) \+/- (\d+)', data)
+        values = [(int(x), int(y)) for x, y in values]
+        return list(zip(*values))
+
+    def _latency(self, data, scale=1):
+        values = findall(r' Latency: (\d+) \+/- (\d+)', data)
+        values = [(float(x)/scale, float(y)/scale) for x, y in values]
+        return list(zip(*values))
 
     def _variable(self, data):
         return [int(x) for x in findall(r'Variable value: X=(\d+)', data)]
@@ -49,32 +53,29 @@ class Ploter:
         size = int(search(r'Transaction size: (\d+)', data).group(1))
         return x * 10**6 / size
 
-    def tx_size(self, data):
-        return search(r'Transaction size: .*', data).group(0)
-
-    def txs_rate(self, data):
-        val = search(r'Transaction rate: (\d+)', data).group(1)
-        return f'Transaction rate: {int(val):,} tx/s'
-
-    def _plot(self, x_label, y_label, y_axis, z_axis, filename):
+    def _plot(self, x_label, y_label, y_axis, z_axis, type):
         plt.figure()
+        markers = cycle(['o', 'v', 's', 'p', 'D', 'P'])
+        self.results.sort(key=self._natural_keys, reverse=(type == 'tps'))
         for result in self.results:
             y_values, y_err = y_axis(result)
             x_values = self._variable(result)
-            assert len(y_values) == len(y_err) and len(y_err) == len(x_values)
+            if len(y_values) != len(y_err) or len(y_err) != len(x_values):
+                raise PlotError('Unequal number of x, y, and y_err values')
 
             plt.errorbar(
-                x_values, y_values, yerr=y_err,  # uplims=True, lolims=True,
-                marker='o', label=z_axis(result), linestyle='dotted'
+                x_values, y_values, yerr=y_err, label=z_axis(result),
+                linestyle='dotted', marker=next(markers), capsize=3
             )
 
+        plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1), ncol=2)
+        plt.xlim(xmin=0)
         plt.ylim(bottom=0)
         plt.xlabel(x_label)
         plt.ylabel(y_label[0])
-        plt.legend(loc='lower left')
+        plt.grid()
         ax = plt.gca()
-        #ax.ticklabel_format(useOffset=False, style='plain')
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.xaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
         ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
         if len(y_label) > 1:
             secaxy = ax.secondary_yaxis(
@@ -83,17 +84,81 @@ class Ploter:
             secaxy.set_ylabel(y_label[1])
             secaxy.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
 
-        plt.savefig(f'{filename}.pdf', bbox_inches='tight')
-        plt.savefig(f'{filename}.png', bbox_inches='tight')
+        for x in ['pdf', 'png']:
+            plt.savefig(PathMaker.plot_file(type, x), bbox_inches='tight')
 
-    def plot_tps(self, x_label, z_axis):
-        assert isinstance(x_label, str)
-        assert hasattr(z_axis, '__call__')
+    @staticmethod
+    def nodes(data):
+        x = search(r'Committee size: (\d+)', data).group(1)
+        f = search(r'Faults: (\d+)', data).group(1)
+        faults = f'({f} faulty)' if f != '0' else ''
+        return f'{x} nodes {faults}'
+
+    @staticmethod
+    def max_latency(data):
+        x = search(r'Max latency: (\d+)', data).group(1)
+        f = search(r'Faults: (\d+)', data).group(1)
+        faults = f'({f} faulty)' if f != '0' else ''
+        return f'Max latency: {float(x) / 1000:,.1f} s {faults}'
+
+    @classmethod
+    def plot_robustness(cls, files):
+        assert isinstance(files, list)
+        assert all(isinstance(x, str) for x in files)
+        z_axis = cls.nodes
+        x_label = 'Input rate (tx/s)'
         y_label = ['Throughput (tx/s)', 'Throughput (MB/s)']
-        self._plot(x_label, y_label, self._tps, z_axis, 'tps')
+        ploter = cls(files)
+        ploter._plot(x_label, y_label, ploter._tps, z_axis, 'robustness')
 
-    def plot_latency(self, x_label, z_axis):
-        assert isinstance(x_label, str)
-        assert hasattr(z_axis, '__call__')
-        y_label = ['Consensus latency (ms)']
-        self._plot(x_label, y_label, self._latency, z_axis, 'latency')
+    @classmethod
+    def plot_latency(cls, files):
+        assert isinstance(files, list)
+        assert all(isinstance(x, str) for x in files)
+        z_axis = cls.nodes
+        x_label = 'Throughput (tx/s)'
+        y_label = ['Latency (ms)']
+        ploter = cls(files)
+        ploter._plot(x_label, y_label, ploter._latency, z_axis, 'latency')
+
+    @classmethod
+    def plot_tps(cls, files):
+        assert isinstance(files, list)
+        assert all(isinstance(x, str) for x in files)
+        z_axis = cls.max_latency
+        x_label = 'Committee size'
+        y_label = ['Throughput (tx/s)', 'Throughput (MB/s)']
+        ploter = cls(files)
+        ploter._plot(x_label, y_label, ploter._tps, z_axis, 'tps')
+
+    @classmethod
+    def plot(cls, params_dict):
+        try:
+            params = PlotParameters(params_dict)
+        except PlotError as e:
+            raise PlotError('Invalid nodes or bench parameters', e)
+
+        # Aggregate the logs.
+        LogAggregator(params.max_latency).print()
+
+        # Load the aggregated log files.
+        robustness_files, latency_files, tps_files = [], [], []
+        tx_size = params.tx_size
+        
+        for f in params.faults:
+            for n in params.nodes:
+                robustness_files += glob(
+                    PathMaker.agg_file('robustness', n, 'x', tx_size, f, 'any')
+                )
+                latency_files += glob(
+                    PathMaker.agg_file('latency', n, 'any', tx_size, f, 'any')
+                )
+            for l in params.max_latency:
+                tps_files += glob(
+                    PathMaker.agg_file('tps', 'x', 'any', tx_size, f, l)
+                )
+
+        # Make the plots.
+        cls.plot_robustness(robustness_files)
+        cls.plot_latency(latency_files)
+        cls.plot_tps(tps_files)
