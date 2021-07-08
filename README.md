@@ -1,4 +1,4 @@
-> **Note to readers:** The Ditto protocol implemented in this repo is currently under developpement and will soon be published. In the meantime, you may be interested in the [2-chain HotStuff](https://github.com/asonnino/hotstuff) and [3-chain HotStuff](https://github.com/asonnino/hotstuff/tree/3-chain) that implements the classic HotStuff protocol.
+> **Note to readers:** The Ditto protocol implemented in this repo is currently under developement and will soon be published. In the meantime, you may be interested in the [2-chain HotStuff](https://github.com/asonnino/hotstuff) and [3-chain HotStuff](https://github.com/asonnino/hotstuff/tree/3-chain) that implements the classic HotStuff protocol.
 
 # Ditto
 
@@ -7,7 +7,7 @@
 [![rustc](https://img.shields.io/badge/rustc-1.50.0+-blue?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![license](https://img.shields.io/badge/license-Apache-blue.svg?style=flat-square)](LICENSE)
 
-This repo provides a minimal implementation of the Ditto protocol, which is 2-chain HotStuff with asynchronous fallback. The codebase has been designed to be small, efficient, and easy to benchmark and modify. It has not been designed to run in production but uses real cryptography ([dalek](https://doc.dalek.rs/ed25519_dalek)), networking ([tokio](https://docs.rs/tokio)), and storage ([rocksdb](https://docs.rs/rocksdb)).
+This repo provides a minimal implementation of the Ditto protocol, which is 2-chain HotStuff with asynchronous fallback. The codebase has been designed to be small, efficient, and easy to benchmark and modify. It has not been designed to run in production but uses real cryptography ([dalek](https://doc.dalek.rs/ed25519_dalek)), networking ([tokio](https://docs.rs/tokio)), and storage ([rocksdb](https://docs.rs/rocksdb)). More details about the protocol can be found in our paper [Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback](https://arxiv.org/abs/2106.10362).
 
 ## Quick Start
 Ditto is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
