@@ -216,7 +216,7 @@ impl Fallback {
             self.fallback_voted_height.insert(block.author, block.height);
             self.fallback_voted_round.insert(block.author, block.round);
         }
-        
+
         // TODO: Write to storage preferred_round and last_voted_round.
         Some(Vote::new(&block, self.name, self.signature_service.clone()).await)
     }
@@ -412,7 +412,7 @@ impl Fallback {
 
         // Cleanup the vote aggregator.
         self.aggregator.cleanup_async(&self.view, &self.round);
-        
+
         self.clean_fallback_state(&view);
 
         self.receive_from_leader = false;
@@ -461,8 +461,8 @@ impl Fallback {
         )
         .await?;
         self.process_block(&block).await?;
-        
-        // Wait for the minimum block delay. 
+
+        // Wait for the minimum block delay.
         sleep(Duration::from_millis(self.parameters.min_block_delay)).await;
         Ok(())
     }
@@ -598,7 +598,7 @@ impl Fallback {
                 // }
 
                 self.commit_ancestors(&b0).await?;
-                
+
                 self.last_committed_round = b0.round;
                 debug!("Committed {:?}", b0);
                 if let Err(e) = self.commit_channel.send(b0.clone()).await {
@@ -622,7 +622,7 @@ impl Fallback {
         // See if we can propose a fallback block extending the fallback QC
         if self.fallback == 1 && block.qc.fallback == 1 && (block.qc.view == self.view && block.qc.height >= self.height) {
             self.update_fallback_high_qc(&block.qc);
-            
+
             self.height = block.qc.height+1;
             let mut qc = block.qc.clone();
             qc.acceptor = self.name;
@@ -714,7 +714,7 @@ impl Fallback {
                 return Ok(());
             }
         }
-        
+
         // Let's see if we have the block's data. If we don't, the mempool
         // will get it and then make us resume processing this block.
         if !self.mempool_driver.verify(block.clone()).await? {
@@ -864,7 +864,7 @@ impl Fallback {
                 // Collected 2f+1 QC of the elected leader, exit the fallback
                 *weight += self.committee.stake(&signed_qc.author);
                 if *weight >= self.committee.quorum_threshold() {
-                    *weight = 0; 
+                    *weight = 0;
 
                     self.exit_fallback(random_coin).await;
                 }
@@ -928,7 +928,7 @@ impl Fallback {
         }
 
         random_coin.verify(&self.committee, &self.pk_set)?;
-        
+
         let view = random_coin.seq;
         self.fallback_random_coin.insert(view, random_coin.clone());
         let message = ConsensusMessage::RandomCoin(random_coin.clone());

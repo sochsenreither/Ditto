@@ -7,6 +7,7 @@ use network::NetMessage;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
+use rand::Rng;
 
 pub type FilterInput = (ConsensusMessage, Vec<SocketAddr>);
 
@@ -44,8 +45,15 @@ impl Filter {
         if let ConsensusMessage::Propose(block) = message {
             // NOTE: Increase the delay here (you can use any value from the 'parameters').
             // Only add network delay for non-fallback block proposals
+            if parameters.random_ddos && block.fallback == 0 {
+                if rand::thread_rng().gen_bool(1.0 / 10.0) {
+                    sleep(Duration::from_millis(parameters.network_delay)).await;
+                    return input;
+                }
+            }
             if parameters.ddos && block.fallback == 0 {
                 sleep(Duration::from_millis(parameters.network_delay)).await;
+                return input;
             }
         }
         input

@@ -13,7 +13,7 @@ class ParseError(Exception):
 
 
 class LogParser:
-    def __init__(self, clients, nodes, faults, protocol, ddos):
+    def __init__(self, clients, nodes, faults, protocol, ddos, random_ddos):
         inputs = [clients, nodes]
         assert all(isinstance(x, list) for x in inputs)
         assert all(isinstance(x, str) for y in inputs for x in y)
@@ -21,6 +21,7 @@ class LogParser:
 
         self.protocol = protocol
         self.ddos = ddos
+        self.random_ddos = random_ddos
         self.faults = faults
         self.committee_size = len(nodes) + faults
 
@@ -180,7 +181,7 @@ class LogParser:
                     assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
                     end = self.commits[batch_id]
-                    latency += [end-start]   
+                    latency += [end-start]
         return mean(latency) if latency else 0
 
     def result(self):
@@ -206,6 +207,7 @@ class LogParser:
             ' + CONFIG:\n'
             f' Protocol: {self.protocol} \n'
             f' DDOS attack: {self.ddos} \n'
+            f' Random DDOS attack: {self.random_ddos} \n'
             f' Committee size: {self.committee_size} nodes\n'
             f' Input rate: {sum(self.rate):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
@@ -238,7 +240,7 @@ class LogParser:
             f.write(self.result())
 
     @classmethod
-    def process(cls, directory, faults=0, protocol=0, ddos=False):
+    def process(cls, directory, faults=0, protocol=0, ddos=False, random_ddos=False):
         assert isinstance(directory, str)
 
         clients = []
@@ -250,4 +252,4 @@ class LogParser:
             with open(filename, 'r') as f:
                 nodes += [f.read()]
 
-        return cls(clients, nodes, faults=faults, protocol=protocol, ddos=ddos)
+        return cls(clients, nodes, faults=faults, protocol=protocol, ddos=ddos, random_ddos=random_ddos)

@@ -12,11 +12,11 @@ from aws.remote import Bench, BenchError
 def local(ctx):
     ''' Run benchmarks on localhost '''
     bench_params = {
-        'nodes': 20,
-        'rate': 1000,
+        'nodes': 10,
+        'rate': 10_000,
         'tx_size': 512,
         'faults': 0,
-        'duration': 120,
+        'duration': 20,
     }
     node_params = {
         'consensus': {
@@ -25,8 +25,9 @@ def local(ctx):
             'max_payload_size': 500,
             'min_block_delay': 0,
             'network_delay': 2000, # message delay on the leaders' proposals during DDoS
-            'ddos': False, # True for DDoS attack on the leader, False otherwise
-            'exp': 1 # multiplicative factor for exponential fallback
+            'ddos': True, # True for DDoS attack on the leader, False otherwise
+            'random_ddos': True,  # True for random DDoS attack on the leader, False otherwise
+            'exp': 5 # multiplicative factor for exponential fallback
         },
         'mempool': {
             'queue_capacity': 10_000,
@@ -104,7 +105,7 @@ def remote(ctx):
         'nodes': [50],
         'rate': [35_000, 40_000],
         'tx_size': 512,
-        'faults': 0, 
+        'faults': 0,
         'duration': 300,
         'runs': 2,
     }
@@ -116,6 +117,7 @@ def remote(ctx):
             'min_block_delay': 100,
             'network_delay': 20_000, # message delay on the leaders' proposals during DDoS
             'ddos': True, # True for DDoS attack on the leader, False otherwise
+            'random_ddos': False,  # True for random DDoS attack on the leader, False otherwise
             'exp': 5 # multiplicative factor for exponential fallback
         },
         'mempool': {
