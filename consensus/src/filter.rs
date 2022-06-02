@@ -3,6 +3,7 @@ use crate::core::ConsensusMessage;
 use bytes::Bytes;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
+use log::debug;
 use network::NetMessage;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -47,6 +48,7 @@ impl Filter {
             // Only add network delay for non-fallback block proposals
             if parameters.random_ddos && block.fallback == 0 {
                 if rand::thread_rng().gen_bool(1.0 / 10.0) {
+                    debug!("Random ddos!");
                     sleep(Duration::from_millis(parameters.network_delay)).await;
                     return input;
                 }
