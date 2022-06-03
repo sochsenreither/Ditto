@@ -123,8 +123,6 @@ class NodeParameters:
         self.network_delay = json['consensus']['network_delay']
         self.ddos = json['consensus']['ddos']
         self.random_ddos = json['consensus']['random_ddos']
-        if self.random_ddos:
-            self.ddos = True
         self.protocol = json['protocol']
         self.json = json
 

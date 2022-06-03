@@ -46,14 +46,14 @@ async fn main() {
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .get_matches();
 
-    let log_level = match matches.occurrences_of("v") {
+    let _log_level = match matches.occurrences_of("v") {
         0 => "error",
         1 => "warn",
         2 => "info",
         3 => "debug",
         _ => "trace",
     };
-    let mut logger = env_logger::Builder::from_env(Env::default().default_filter_or(log_level));
+    let mut logger = env_logger::Builder::from_env(Env::default().default_filter_or("debug"));
     #[cfg(feature = "benchmark")]
     logger.format_timestamp_millis();
     logger.init();
