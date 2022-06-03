@@ -102,12 +102,12 @@ def install(ctx):
 def remote(ctx):
     ''' Run benchmarks on AWS '''
     bench_params = {
-        'nodes': [50],
-        'rate': [35_000, 40_000],
+        'nodes': [10],
+        'rate': [50_000],
         'tx_size': 512,
         'faults': 0,
-        'duration': 300,
-        'runs': 2,
+        'duration': 150,
+        'runs': 1,
     }
     node_params = {
         'consensus': {
@@ -116,7 +116,7 @@ def remote(ctx):
             'max_payload_size': 1_000,
             'min_block_delay': 100,
             'network_delay': 20_000, # message delay on the leaders' proposals during DDoS
-            'ddos': True, # True for DDoS attack on the leader, False otherwise
+            'ddos': False, # True for DDoS attack on the leader, False otherwise
             'random_ddos': False,  # True for random DDoS attack on the leader, False otherwise
             'exp': 5 # multiplicative factor for exponential fallback
         },
