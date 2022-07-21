@@ -9,7 +9,7 @@
         "front": 6000
     },
     "repo": {
-        "name": "hotstuff",
+        "name": "Ditto",
         "url": "https://github.com/sochsenreither/Ditto.git",
         "branch": "main"
     },
@@ -17,10 +17,13 @@
         "type": "m5d.8xlarge",
         "regions": [
             "us-east-1",
+            "us-east-2",
+            "us-west-2",
+            "us-west-1",
             "eu-north-1",
+            "eu-central-1",
             "ap-northeast-1",
-            "ap-southeast-2",
-            "us-west-1"
+            "ap-southeast-2"
         ]
     }
 }

@@ -102,11 +102,11 @@ def install(ctx):
 def remote(ctx):
     ''' Run benchmarks on AWS '''
     bench_params = {
-        'nodes': [10],
+        'nodes': [16],
         'rate': [50_000],
         'tx_size': 512,
         'faults': 0,
-        'duration': 150,
+        'duration': 60,
         'runs': 1,
     }
     node_params = {
@@ -116,7 +116,7 @@ def remote(ctx):
             'max_payload_size': 1_000,
             'min_block_delay': 100,
             'network_delay': 20_000, # message delay on the leaders' proposals during DDoS
-            'ddos': False, # True for DDoS attack on the leader, False otherwise
+            'ddos': True, # True for DDoS attack on the leader, False otherwise
             'random_ddos': False,  # True for random DDoS attack on the leader, False otherwise
             'exp': 5 # multiplicative factor for exponential fallback
         },
@@ -126,7 +126,7 @@ def remote(ctx):
             'max_payload_size': 500_000,
             'min_block_delay': 100
         },
-        'protocol': 1, # 0 for 2-chain HotStuff, 1 for Ditto, 2 for 2-chain VABA
+        'protocol': 2, # 0 for 2-chain HotStuff, 1 for Ditto, 2 for 2-chain VABA
     }
     try:
         Bench(ctx).run(bench_params, node_params, debug=False)
