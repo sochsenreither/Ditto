@@ -144,7 +144,7 @@ class Ploter:
         # Load the aggregated log files.
         robustness_files, latency_files, tps_files = [], [], []
         tx_size = params.tx_size
-        
+
         for f in params.faults:
             for n in params.nodes:
                 robustness_files += glob(

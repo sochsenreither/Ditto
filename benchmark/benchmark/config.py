@@ -108,6 +108,7 @@ class NodeParameters:
             inputs += [json['consensus']['ddos']]
             inputs += [json['consensus']['random_ddos']]
             inputs += [json['consensus']['exp']]
+            inputs += [json['consensus']['ddos_chance']] #
             inputs += [json['mempool']['queue_capacity']]
             inputs += [json['consensus']['sync_retry_delay']]
             inputs += [json['mempool']['max_payload_size']]
@@ -123,6 +124,7 @@ class NodeParameters:
         self.network_delay = json['consensus']['network_delay']
         self.ddos = json['consensus']['ddos']
         self.random_ddos = json['consensus']['random_ddos']
+        self.ddos_chance = json['consensus']['ddos_chance']
         self.protocol = json['protocol']
         self.json = json
 

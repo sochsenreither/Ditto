@@ -145,7 +145,7 @@ class LocalBench:
 
             # Parse logs and return the parser.
             Print.info('Parsing logs...')
-            return LogParser.process('./logs', self.faults, self.node_parameters.protocol, self.node_parameters.ddos, self.node_parameters.random_ddos)
+            return LogParser.process('./logs', self.faults, self.node_parameters.protocol, self.node_parameters.ddos, self.node_parameters.random_ddos, self.node_parameters.ddos_chance)
 
         except (subprocess.SubprocessError, ParseError) as e:
             self._kill_nodes()

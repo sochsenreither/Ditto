@@ -47,7 +47,8 @@ impl Filter {
             // NOTE: Increase the delay here (you can use any value from the 'parameters').
             // Only add network delay for non-fallback block proposals
             if block.fallback == 0 {
-                if parameters.random_ddos && rand::thread_rng().gen_bool(1.0 / 5.0) {
+                debug!("Total filters");
+                if parameters.random_ddos && rand::thread_rng().gen_bool((parameters.ddos_chance as f64) / 100.0) {
                     debug!("Random ddos!");
                     sleep(Duration::from_millis(parameters.network_delay)).await;
                     return input;

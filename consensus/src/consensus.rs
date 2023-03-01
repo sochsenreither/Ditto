@@ -1,7 +1,7 @@
 use crate::config::{Committee, Parameters, Protocol};
-use crate::fallback::Fallback;
 use crate::core::{ConsensusMessage, Core};
 use crate::error::ConsensusResult;
+use crate::fallback::Fallback;
 use crate::filter::Filter;
 use crate::leader::LeaderElector;
 use crate::mempool::{ConsensusMempoolMessage, MempoolDriver};
@@ -29,7 +29,7 @@ impl Consensus {
         parameters: Parameters,
         store: Store,
         signature_service: SignatureService,
-        pk_set: PublicKeySet,   // The set of tss public keys
+        pk_set: PublicKeySet, // The set of tss public keys
         tx_core: Sender<ConsensusMessage>,
         rx_core: Receiver<ConsensusMessage>,
         tx_consensus_mempool: Sender<ConsensusMempoolMessage>,
@@ -52,14 +52,9 @@ impl Consensus {
             "Consensus min block delay set to {} ms",
             parameters.min_block_delay
         );
-        info!(
-            "ddos {}",
-            parameters.ddos
-        );
-        info!(
-            "random ddos {}",
-            parameters.random_ddos
-        );
+        info!("ddos {}", parameters.ddos);
+        info!("random ddos {}", parameters.random_ddos);
+        info!("random ddos chance {}", parameters.ddos_chance);
 
         let (tx_network, rx_network) = channel(10000);
         let (tx_filter, rx_filter) = channel(10000);
@@ -101,7 +96,8 @@ impl Consensus {
         .await;
 
         match protocol {
-            Protocol::HotStuff => {  // Run HotStuff
+            Protocol::HotStuff => {
+                // Run HotStuff
                 let mut core = Core::new(
                     name,
                     committee,
@@ -118,8 +114,9 @@ impl Consensus {
                 tokio::spawn(async move {
                     core.run().await;
                 });
-            },
-            Protocol::AsyncHotStuff => {  // Run AsyncHotStuff
+            }
+            Protocol::AsyncHotStuff => {
+                // Run AsyncHotStuff
                 let mut hotstuff_with_fallback = Fallback::new(
                     name,
                     committee,
@@ -138,8 +135,9 @@ impl Consensus {
                 tokio::spawn(async move {
                     hotstuff_with_fallback.run().await;
                 });
-            },
-            Protocol::TwoChainVABA => {  // Run TwoChainVABA, which is just fallback with timeout=0, i.e., immediately send timeout after exiting a fallback
+            }
+            Protocol::TwoChainVABA => {
+                // Run TwoChainVABA, which is just fallback with timeout=0, i.e., immediately send timeout after exiting a fallback
                 let mut vaba = Fallback::new(
                     name,
                     committee,
@@ -158,10 +156,10 @@ impl Consensus {
                 tokio::spawn(async move {
                     vaba.run().await;
                 });
-            },
+            }
             _ => {
                 return Ok(());
-            },
+            }
         }
 
         Ok(())
