@@ -16,7 +16,7 @@ def local(ctx):
         'rate': 200,
         'tx_size': 512,
         'faults': 0,
-        'duration': 30,
+        'duration': 300,
     }
     node_params = {
         'consensus': {
@@ -28,7 +28,7 @@ def local(ctx):
             'ddos': False, # True for DDoS attack on the leader, False otherwise
             'random_ddos': True,  # True for random DDoS attack on the leader, False otherwise
             'exp': 5, # multiplicative factor for exponential fallback
-            'ddos_chance': 99 # chance in percent for ddos
+            'ddos_chance': 10 # chance in percent for ddos
         },
         'mempool': {
             'queue_capacity': 10_000,
