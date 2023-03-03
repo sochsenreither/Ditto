@@ -16,7 +16,7 @@ def local(ctx):
         'rate': 200,
         'tx_size': 512,
         'faults': 0,
-        'duration': 300,
+        'duration': 180,
     }
     node_params = {
         'consensus': {
@@ -28,7 +28,7 @@ def local(ctx):
             'ddos': False, # True for DDoS attack on the leader, False otherwise
             'random_ddos': True,  # True for random DDoS attack on the leader, False otherwise
             'exp': 5, # multiplicative factor for exponential fallback
-            'ddos_chance': 10 # chance in percent for ddos
+            'ddos_chance': 5 # chance in percent for ddos
         },
         'mempool': {
             'queue_capacity': 10_000,
@@ -46,7 +46,7 @@ def local(ctx):
 
 
 @task
-def create(ctx, nodes=8):
+def create(ctx, nodes=4):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -103,12 +103,12 @@ def install(ctx):
 def remote(ctx):
     ''' Run benchmarks on AWS '''
     bench_params = {
-        'nodes': [64],
-        'rate': [20_000, 30_000, 40_000],
+        'nodes': [32],
+        'rate': [50_000],
         'tx_size': 512,
         'faults': 0,
-        'duration': 60,
-        'runs': 1,
+        'duration': 180,
+        'runs': 2,
     }
     node_params = {
         'consensus': {
@@ -118,8 +118,9 @@ def remote(ctx):
             'min_block_delay': 100,
             'network_delay': 20_000, # message delay on the leaders' proposals during DDoS
             'ddos': False, # True for DDoS attack on the leader, False otherwise
-            'random_ddos': False,  # True for random DDoS attack on the leader, False otherwise
-            'exp': 5 # multiplicative factor for exponential fallback
+            'random_ddos': True,  # True for random DDoS attack on the leader, False otherwise
+            'exp': 5, # multiplicative factor for exponential fallback
+            'ddos_chance': 10 # chance in percent for ddos
         },
         'mempool': {
             'queue_capacity': 100_000,
